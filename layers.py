@@ -4,6 +4,8 @@ from torch.autograd import Variable
 import torch.nn.functional as F
 
 
+# Built on original code base of (Check layers_torch.py): 
+# https://github.com/nke001/sparse_attentive_backtracking_release
 class Sparse_attention(nn.Module):
     def __init__(self, top_k=5):
         super(Sparse_attention, self).__init__()
@@ -26,6 +28,8 @@ class Sparse_attention(nn.Module):
         return attn_w_normalize
 
 
+# Built on original code base of (Check layers_torch.py): 
+# https://github.com/nke001/sparse_attentive_backtracking_release
 class self_LSTM_sparse_attn_predict(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, num_classes,
                  truncate_length=100, predict_m=10, block_attn_grad_past=False, attn_every_k=1, top_k=5):
@@ -37,9 +41,6 @@ class self_LSTM_sparse_attn_predict(nn.Module):
         self.block_attn_grad_past = block_attn_grad_past
         self.truncate_length = truncate_length
         self.lstm1 = nn.LSTMCell(input_size, hidden_size)
-        self.fc = nn.Linear(hidden_size * 2, num_classes)  # num_classes -> 1
-        self.fc1 = nn.Linear(hidden_size, num_classes)
-        self.fc2 = nn.Linear(hidden_size, num_classes)
         self.attn_every_k = attn_every_k
         self.top_k = top_k
         self.tanh = torch.nn.Tanh()
@@ -138,15 +139,12 @@ class self_LSTM_sparse_attn_predict(nn.Module):
             # For visualization purposes:
             attn_all += [attn_c]
 
-        predicted_all = torch.stack(predicted_all, 1)  # predicted_all = (batch_size, time_step, hidden_size)
-        outputs = torch.stack(outputs, 1)  # outputs = (batch_size, time_step, hidden_size)
-        attn_all = torch.stack(attn_all, 1)  # attn_all = (batch_size, time_step, hidden_size)
-
         return attn_c, out_attn_w
 
 
+# Built on original code base of (Check layers.py): 
+# https://github.com/Diego999/pyGAT
 class GraphAttentionLayer(nn.Module):
-
     def __init__(self, in_cfeatures, in_xfeatures, out_features, att_dim, bs, dropout, alpha, concat=True):
         super(GraphAttentionLayer, self).__init__()
         self.in_cfeatures = in_cfeatures
@@ -201,24 +199,24 @@ class GraphAttentionLayer(nn.Module):
         a_input = torch.cat([h.repeat(1, 1, N).view(h.shape[0], N * N, -1), h.repeat(1, N, 1)], dim=2).view(h.shape[0],
                 N, -1, 2 * self.out_features)
         e = self.leakyrelu(torch.matmul(a_input, self.a).squeeze(3))
-        zero_vec = -9e15 * torch.ones_like(e)  # shape = (B, N, N)
-        attention = torch.where(adj > 0, e, zero_vec)  # shape = (B, N, N)
-        attention = F.dropout(attention, self.dropout, training=self.training)  # shape = (B, N, N)
+        zero_vec = -9e15 * torch.ones_like(e)  # shape = (bs, N, N)
+        attention = torch.where(adj > 0, e, zero_vec)  # shape = (bs, N, N)
+        attention = F.dropout(attention, self.dropout, training=self.training)  # shape = (bs, N, N)
 
         # Find the attention vectors for side_wise crime similarity
         h_side = torch.matmul(side_input, self.WS)  # h = [h_1, h_2, h_3, ... , h_N] * W
         a_input_side = torch.cat([h_side.repeat(1, 1, N).view(self.bs, N * N, -1), h_side.repeat(1, N, 1)], dim=2).view(
                     self.bs, N, -1, 2 * self.out_features)
         e_side = self.leakyrelu(torch.matmul(a_input_side, self.aS).squeeze(3))
-        attention_side = torch.where(adj > 0, e_side, zero_vec)  # shape = (B, N, N)
-        attention_side = F.dropout(attention_side, self.dropout, training=self.training)  # shape = (B, N, N)
+        attention_side = torch.where(adj > 0, e_side, zero_vec)  # shape = (bs, N, N)
+        attention_side = F.dropout(attention_side, self.dropout, training=self.training)  # shape = (bs, N, N)
 
         # Find the crime representation of a region: c_{i,t}^k
         attention = attention + attention_side
-        attention = torch.where(attention > 0, attention, zero_vec)  # shape = (B, N, N)
-        attention = F.softmax(attention, dim=2)  # shape = (B, N, N)
-        attention = F.dropout(attention, self.dropout, training=self.training)  # shape = (B, N, N)
-        h_prime = torch.matmul(attention, h)  # shape = (B, N, F')
+        attention = torch.where(attention > 0, attention, zero_vec)  # shape = (bs, N, N)
+        attention = F.softmax(attention, dim=2)  # shape = (bs, N, N)
+        attention = F.dropout(attention, self.dropout, training=self.training)  # shape = (bs, N, N)
+        h_prime = torch.matmul(attention, h)  # shape = (bs, N, F')
 
         """
             Step 2: Generate e_{i,t}^k
@@ -226,32 +224,32 @@ class GraphAttentionLayer(nn.Module):
         # Generate Query Vector
         q = torch.cat([input.repeat(1, 1, N).view(input.shape[0], N * N, -1), input.repeat(1, N, 1)], dim=2).view(
             input.shape[0], N, N, -1)
-        q = torch.matmul(q, self.WQ)  # (B, N, N, dq) = (B, N, N, 2) * (2, dq)
+        q = torch.matmul(q, self.WQ)  # (bs, N, N, dq) = (bs, N, N, 2) * (2, dq)
         q = q / (self.att_dim ** 0.5)
-        q = q.unsqueeze(3)  # (B, N, N, 1, dq)
+        q = q.unsqueeze(3)  # (bs, N, N, 1, dq)
 
         # Generate Key Vector
         ext_input = ext_input.unsqueeze(3)
         k = torch.cat([ext_input.repeat(1, 1, N, 1).view(ext_input.shape[0], N * N, self.in_xfeatures, -1),
                        ext_input.repeat(1, N, 1, 1).view(ext_input.shape[0], N * N, self.in_xfeatures, -1)], dim=3). \
             view(ext_input.shape[0], N, N, self.in_xfeatures, 2)
-        k = torch.matmul(k, self.WK)  # (B, N, N, in_xfeatures, dk) = (B, N, N, in_xfeatures, 2)* (2, dk)
-        k = torch.transpose(k, 4, 3)  # (B, N, N, dk, in_xfeatures)
+        k = torch.matmul(k, self.WK)  # (bs, N, N, in_xfeatures, dk) = (bs, N, N, in_xfeatures, 2)* (2, dk)
+        k = torch.transpose(k, 4, 3)  # (bs, N, N, dk, in_xfeatures)
 
         # Generate Value Vector
-        v = torch.matmul(ext_input, self.WV)  # (B, N, N, in_xfeatures, dv)
+        v = torch.matmul(ext_input, self.WV)  # (bs, N, N, in_xfeatures, dv)
 
         # Generate dot product attention
-        dot_attention = torch.matmul(q, k).squeeze(3)  # (B, N, N, in_xfeatures)
+        dot_attention = torch.matmul(q, k).squeeze(3)  # (bs, N, N, in_xfeatures)
         zero_vec = -9e15 * torch.ones_like(dot_attention)
-        dot_attention = torch.where(dot_attention > 0, dot_attention, zero_vec)  # (B, N, N, in_xfeatures)
-        dot_attention = F.softmax(dot_attention, dim=3)  # shape = (B, N, N, in_xfeatures)
+        dot_attention = torch.where(dot_attention > 0, dot_attention, zero_vec)  # (bs, N, N, in_xfeatures)
+        dot_attention = F.softmax(dot_attention, dim=3)  # shape = (bs, N, N, in_xfeatures)
 
         # Generate the external feature representation of the regions: e_{i,t}^k
         crime_attention = attention.unsqueeze(3).repeat(1, 1, 1, self.in_xfeatures)
         final_attention = dot_attention * crime_attention
-        ext_rep = torch.matmul(final_attention, v)  # shape = (B, N, N, dv)
-        ext_rep = ext_rep.sum(dim=2)  # shape = (B, N, N, dv)
+        ext_rep = torch.matmul(final_attention, v)  # (bs, N, N, dv)
+        ext_rep = ext_rep.sum(dim=2)  # (bs, N, N, dv)
 
         if self.concat:
             return F.elu(h_prime), F.elu(ext_rep)

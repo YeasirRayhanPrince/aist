@@ -8,7 +8,7 @@ import pickle
 
 
 class AIST(nn.Module):
-    def __init__(self, ncfeat, nxfeat, gout, gatt, rhid, ratt, rlayer, rclass, bs, rts, city, tr, tc):
+    def __init__(self, ncfeat, nxfeat, gout, gatt, rhid, ratt, rlayer, bs, rts, city, tr, tc):
         super(AIST, self).__init__()
         self.ncfeat = ncfeat
         self.nxfeat = nxfeat
@@ -17,7 +17,6 @@ class AIST(nn.Module):
         self.rhid = rhid
         self.ratt = ratt
         self.rlayer = rlayer
-        self.rclass = rclass
         self.bs = bs
         self.rts = rts
         self.tr = tr
@@ -26,24 +25,22 @@ class AIST(nn.Module):
 
         self.smod = Spatial_Module(self.ncfeat, self.nxfeat, self.gout, self.gatt, 0.5, 0.6, self.rts, self.bs,
                         self.tr, self.tc, self.city)
-        self.sab1 = self_LSTM_sparse_attn_predict(2 * self.gout, self.rhid, self.rlayer, self.rclass,
+        self.sab1 = self_LSTM_sparse_attn_predict(2 * self.gout, self.rhid, self.rlayer, 1,
                     truncate_length=5, top_k=4, attn_every_k=5, predict_m=10)
-        self.sab2 = self_LSTM_sparse_attn_predict(1, self.rhid, self.rlayer, self.rclass,
+        self.sab2 = self_LSTM_sparse_attn_predict(1, self.rhid, self.rlayer, 1,
                     truncate_length=5, top_k=4, attn_every_k=5, predict_m=10)
-        self.sab3 = self_LSTM_sparse_attn_predict(1, self.rhid, self.rlayer, self.rclass,
+        self.sab3 = self_LSTM_sparse_attn_predict(1, self.rhid, self.rlayer, 1,
                     truncate_length=1, top_k=3, attn_every_k=1, predict_m=10)
 
         self.fc1 = nn.Linear(self.rhid, 1)
-        self.fc2 = nn.Linear(2 * self.rhid, self.rclass)
-        self.fc3 = nn.Linear(3 * self.rhid, self.rclass)
 
         self.wv = nn.Linear(self.rhid, self.ratt)  # (S, E) x (E, 1) = (S, 1)
         self.wu = nn.Parameter(torch.zeros(size=(self.bs, self.ratt)))  # attention of the trends
         nn.init.xavier_uniform_(self.wu.data, gain=1.414)
         self.dropout_layer = nn.Dropout(p=0.2)
 
-    def forward(self, x_crime, x_crime_daily, x_crime_weekly, x_regions, x_sp_crime, x_ext, s_crime):
-        x_crime = self.smod(x_sp_crime, x_regions, x_ext, s_crime)
+    def forward(self, x_crime, x_crime_daily, x_crime_weekly, x_regions, x_ext, s_crime):
+        x_crime = self.smod(x_crime, x_regions, x_ext, s_crime)
 
         x_con, x_con_attn = self.sab1(x_crime)  # (bs, rts)
         x_con = self.dropout_layer(x_con)
@@ -77,7 +74,6 @@ class AIST(nn.Module):
 
 class Spatial_Module(nn.Module):
     def __init__(self, ncfeat, nxfeat, nofeat, gatt, dropout, alpha, ts, bs, tr, tc, city):
-
         super(Spatial_Module, self).__init__()
         self.ncfeat = ncfeat
         self.nxfeat = nxfeat
@@ -125,7 +121,7 @@ class Spatial_Module(nn.Module):
             np.savetxt("gat_feat.txt", feat[i], fmt='%d')
             np.savetxt("gat_feat_ext.txt", feat_ext[i], fmt='%d')
             np.savetxt("gat_crime_side.txt", crime_side[i], fmt='%d')
-            adj, features, features_ext, crime_side_features = load_data_GAT()
+            adj, features, features_ext, crime_side_features = load_data_GAT(self.bs)
 
             out, ext = self.gat[j](features, adj, features_ext, crime_side_features)  # (N, F')(N, N, dv)
             out = out[:, -1, :]

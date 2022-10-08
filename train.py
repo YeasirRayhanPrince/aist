@@ -48,10 +48,9 @@ nxfeature = d.nxf
 slstm_nhid = d.rhid
 slstm_nlayer = d.rl
 slstm_att = d.ratt
-nclasses = 2
 
 gen_gat_adj_file(target_city, target_region)   # generate the adj_matrix file for GAT layers
-loaded_data = torch.from_numpy(np.loadtxt("data/" + target_city + "/com_crime/r_" + str(target_region) + ".txt", dtype=np.int)).T
+loaded_data = torch.from_numpy(np.loadtxt("data/" + target_city + "/com_crime/r_" + str(target_region) + ".txt", dtype=int)).T
 loaded_data = loaded_data[:, target_cat:target_cat+1]
 x, y, x_daily, x_weekly = create_inout_sequences(loaded_data)
 
@@ -63,12 +62,12 @@ y = torch.from_numpy(scale.fit_transform(y))
 
 # Divide your data into train set & test set
 train_x_size = int(x.shape[0] * .67)
-train_x = x[: train_x_size, :]  # (ns_tr, ts)
+train_x = x[: train_x_size, :]  # (ns_tr=num of train samples, ts)
 train_x_daily = x_daily[: train_x_size, :]
 train_x_weekly = x_weekly[: train_x_size, :]
 train_y = y[: train_x_size, :]  # (ns_tr, 1)
 
-test_x = x[train_x_size:, :]  # (ns_te, ts) = (683, ts)
+test_x = x[train_x_size:, :]  # (ns_te = num of test samples, ts) = (683, ts)
 test_x_daily = x_daily[train_x_size:, :]
 test_x_weekly = x_weekly[train_x_size:, :]
 test_x = test_x[:test_x.shape[0] - 11, :]  # 11 is subtracted to make ns_te compatible with bs
@@ -78,7 +77,7 @@ test_y = y[train_x_size:, :]
 test_y = test_y[:test_y.shape[0] - 11, :]
 
 # Divide it into batches
-train_x = train_x.view(int(train_x.shape[0] / batch_size), batch_size, time_step)  # (nb, bs, rts)
+train_x = train_x.view(int(train_x.shape[0] / batch_size), batch_size, time_step)  # (nb=num of batches, bs, rts)
 train_x_daily = train_x_daily.view(int(train_x_daily.shape[0] / batch_size), batch_size, train_x_daily.shape[1])  # (nb, bs, dts)
 train_x_weekly = train_x_weekly.view(int(train_x_weekly.shape[0] / batch_size), batch_size, train_x_weekly.shape[1])  # (nb, bs, rws)
 train_y = train_y.view(int(train_y.shape[0] / batch_size), batch_size, 1)
@@ -89,12 +88,12 @@ test_x_weekly = test_x_weekly.view(int(test_x_weekly.shape[0] / batch_size), bat
 test_y = test_y.view(int(test_y.shape[0] / batch_size), batch_size, 1)
 
 # load data for external_features and side_features
-train_feat, test_feat = load_data_regions(target_cat, target_region, target_city)
-train_feat_ext, test_feat_ext = load_data_regions_external(target_region, target_city)
-train_crime_side, test_crime_side = load_data_sides_crime(target_cat, target_region, target_city)
+train_feat, test_feat = load_data_regions(batch_size, target_cat, target_region, target_city)
+train_feat_ext, test_feat_ext = load_data_regions_external(batch_size, nxfeature, target_region, target_city)
+train_crime_side, test_crime_side = load_data_sides_crime(batch_size, target_cat, target_region, target_city)
 
 # Model and optimizer
-model = AIST(ncfeature, nxfeature, gat_out, gat_att, slstm_nhid, slstm_att, slstm_nlayer, nclasses, batch_size,
+model = AIST(ncfeature, nxfeature, gat_out, gat_att, slstm_nhid, slstm_att, slstm_nlayer, batch_size,
              recent_time_step, target_city, target_region, target_cat)
 n = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
@@ -114,12 +113,11 @@ patience = 100
 
 train_batch = train_x.shape[0]
 test_batch = test_x.shape[0]
-print(train_batch, test_batch)
 
 for epoch in range(epochs):
     i = 0
     loss_values_batch = []
-    for i in range(train_batch):  # 10
+    for i in range(train_batch):
         t = time.time()
 
         x_crime = Variable(train_x[i]).float()
@@ -129,7 +127,7 @@ for epoch in range(epochs):
 
         model.train()
         optimizer.zero_grad()
-        output, attn = model(x_crime, x_crime_daily, x_crime_weekly, train_feat[i], train_x[i], train_feat_ext[i], train_crime_side[i])
+        output, attn = model(x_crime, x_crime_daily, x_crime_weekly, train_feat[i], train_feat_ext[i], train_crime_side[i])
         y = y.view(-1, 1)
 
         loss_train = criterion(output, y)
@@ -169,7 +167,7 @@ for epoch in range(epochs):
 print("Optimization Finished!")
 print("Total time elapsed: {:.4f}s".format(time.time() - t_total))
 
-# best_epoch = 149
+# best_epoch = -1
 print('Loading {}th epoch'.format(best_epoch))
 model.load_state_dict(torch.load('{}.pkl'.format(best_epoch)))
 f = open('result/aist.txt','a')
@@ -188,7 +186,7 @@ def compute_test():
         x_crime_weekly_test = Variable(test_x_weekly[i]).float()
         y_test = Variable(test_y[i]).float()
 
-        output_test, list_att = model(x_crime_test, x_crime_daily_test, x_crime_weekly_test, test_feat[i], test_x[i], test_feat_ext[i], test_crime_side[i])
+        output_test, list_att = model(x_crime_test, x_crime_daily_test, x_crime_weekly_test, test_feat[i], test_feat_ext[i], test_crime_side[i])
         y_test = y_test.view(-1, 1)
         y_test = torch.from_numpy(scale.inverse_transform(y_test))
         output_test = torch.from_numpy(scale.inverse_transform(output_test.detach()))
@@ -198,6 +196,9 @@ def compute_test():
 
         loss_test = criterion(output_test, y_test)
 
+        # for j in range(42):
+        #     print(y_test[j, :].data.item(), output_test[j, :].data.item())
+            
         loss += loss_test.data.item()
         print("Test set results:",
               "loss= {:.4f}".format(loss_test.data.item()))
