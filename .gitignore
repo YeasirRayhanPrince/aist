@@ -1,0 +1,7 @@
+*.pkl
+__pycache__
+result
+gat_crime_side.txt
+gat_feat.txt
+gat_feat_ext.txt
+tem_gat_adj.txt

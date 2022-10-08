@@ -101,8 +101,8 @@ n = sum(p.numel() for p in model.parameters() if p.requires_grad)
 lr = 0.001
 weight_decay = 5e-4
 optimizer = optim.Adam(model.parameters(), lr=lr)
-criterion = nn.MSELoss()
-# criterion = nn.L1Loss()
+# criterion = nn.MSELoss()
+criterion = nn.L1Loss()
 
 epochs = 300
 best = epochs + 1
