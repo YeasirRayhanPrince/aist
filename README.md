@@ -13,7 +13,7 @@ pip install -r requirements.txt
 
 ## Training
 
-To train AIST on 2019 'theft' data of Lincoln Park, Chicago, run this command:
+To train AIST on 2019 'theft' data of Near North Side, Chicago, run this command:
 
 ```train
 python train.py
