@@ -19,3 +19,8 @@ To train AIST on 2019 'theft' data of Lincoln Park, Chicago, run this command:
 python train.py
 ```
 
+To further train AIST on different crime categories and communities of Chicago, run this command:
+```train
+python train.py --tct=chicago --tr=ID1 --tc=ID2
+```
+For IDs of the communities or the crime-categories, check `data/chicago/chicago_cid_to_name.txt` and `data/chicago/chicago_crime-cat_to_id.txt`
