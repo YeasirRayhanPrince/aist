@@ -1,6 +1,6 @@
 # AIST: An Interpretable Attention-Based Deep Learning Model for Crime Prediction
 
-This repository is the official implementation of [AIST: An Interpretable Attention-Based Deep Learning Model for Crime Prediction](https://dl.acm.org/doi/10.1145/3582274). 
+This repository contains the code for [AIST: An Interpretable Attention-Based Deep Learning Model for Crime Prediction](https://dl.acm.org/doi/10.1145/3582274). 
 
 ## Requirements
 
